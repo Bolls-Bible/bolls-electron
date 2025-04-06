@@ -1,36 +1,45 @@
-import { app, BrowserWindow, shell, Menu, session, Tray } from "electron";
+import { Menu, session, Tray } from "electron";
+import { app, BrowserWindow, shell } from "electron/main";
 import Store from "electron-store";
+import path from "node:path";
 
-let win, tray;
+let win;
+let tray;
 
 const store = new Store();
+
+const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+// const host = isDev ? "https://bolls.local" : "https://bolls.life";
+const host = "https://bolls.life";
+// const host = "https://bolls.local";
 
 function createTray() {
   tray = new Tray("build/tray.png");
   tray.setToolTip("Bolls");
 
-  let trayMenu = Menu.buildFromTemplate([
-    {
-      label: "Bolls",
-      click: () => {
-        win.show();
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Bolls",
+        click: () => {
+          win.show();
+        },
       },
-    },
-    { type: "separator" },
-    {
-      label: "New Window",
-      accelerator: "CmdOrCtrl+shift+N",
-      click: createWindow,
-    },
-    {
-      label: "New Private Window",
-      accelerator: "CmdOrCtrl+shift+P",
-      click: createPrivateWindow,
-    },
-    { type: "separator" },
-    { role: "quit" },
-  ]);
-  tray.setContextMenu(trayMenu);
+      { type: "separator" },
+      {
+        label: "New Window",
+        accelerator: "CmdOrCtrl+shift+N",
+        click: createWindow,
+      },
+      {
+        label: "New Private Window",
+        accelerator: "CmdOrCtrl+shift+P",
+        click: createPrivateWindow,
+      },
+      { type: "separator" },
+      { role: "quit" },
+    ])
+  );
 }
 
 const menu = Menu.buildFromTemplate([
@@ -115,17 +124,10 @@ function createPrivateWindow() {
     height: mainWindowState.height,
   });
 
-  private_win.loadURL("https://bolls.life", {
-    userAgent:
-      "'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36'",
-  });
+  private_win.loadURL(host);
 
   private_win.once("ready-to-show", () => {
     private_win.show();
-  });
-  private_win.webContents.on("new-window", function (e, url) {
-    e.preventDefault();
-    shell.openExternal(url);
   });
   private_win.on("enter-full-screen", () => {
     private_win.setAutoHideMenuBar(true);
@@ -138,7 +140,6 @@ function createPrivateWindow() {
 function createWindow() {
   // Used to offset every new window to avoid overlaping with existing windows
   let windows_count = windowsCount();
-  console.log(getMainWindowState());
   const winState = getMainWindowState();
 
   // Create the browser window.
@@ -188,17 +189,9 @@ function createWindow() {
   }
 
   // win.webContents.openDevTools()
-  // win.loadURL('http://0.0.0.0:8000', {userAgent: 'Chrome'})
-  win.loadURL("https://bolls.life", {
-    userAgent:
-      "'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0'",
-  });
+  win.loadURL(host);
   win.once("ready-to-show", () => {
     win.show();
-  });
-  win.webContents.on("new-window", function (e, url) {
-    e.preventDefault();
-    shell.openExternal(url);
   });
 
   win.on("enter-full-screen", () => {
@@ -211,22 +204,70 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-  // I need to clean up all service workers and cache only once
-  const didClear = store.get("didClear");
-  if (!didClear) {
-    session.defaultSession.clearStorageData({ storages: ["serviceworkers"] });
-    session.defaultSession.clearStorageData({ storages: ["caches"] });
-    // now memorize you did this, but localStorage is not available in main process
-    store.set("didClear", "true");
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient("bolls", process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
   }
+} else {
+  app.setAsDefaultProtocolClient("bolls");
+}
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit(); // or maybe ignore
+} else {
+  app.on("second-instance", async (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
     }
+    const mainSession = win.webContents.session
+      ? win.webContents.session
+      : session.defaultSession;
+    // the commandLine is array of strings in which last element is deep link url
+    const url = new URL(commandLine.pop());
+    if (url.protocol !== "bolls:" || !url.searchParams.get("sessionid")) return;
+    // if the we already have the cookie set -- we don't need to set it again
+    const mySessionidCookies = await mainSession.cookies.get({
+      name: "sessionid",
+    });
+    const mySessionid = mySessionidCookies[0]?.value;
+
+    if (mySessionid === atob(url.searchParams.get("sessionid"))) return;
+
+    mainSession.cookies.set({
+      url: host,
+      name: "sessionid",
+      value: atob(url.searchParams.get("sessionid")),
+      expirationDate: Math.floor(Date.now() / 1000) + 31536000, // Expires in 1 year
+    });
+    // then reload the main window
+    win.loadURL(host);
+  });
+
+  // Create win, load the rest of the app, etc...
+  app.whenReady().then(() => {
+    createWindow();
+    createTray();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
+app.on("web-contents-created", (_, contents) => {
+  contents.setWindowOpenHandler((details) => {
+    if (details.disposition === "foreground-tab") {
+      shell.openExternal(details.url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
   });
 });
 

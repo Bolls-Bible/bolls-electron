@@ -106,3 +106,4 @@ node_modules/
 .flatpak-builder/
 _build/
 package-lock.json
+out/

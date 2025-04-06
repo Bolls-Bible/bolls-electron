@@ -1,6 +1,6 @@
 {
   "name": "bolls",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "main": "out/main/main.js",
   "license": "MIT",
   "type": "module",
@@ -20,12 +20,12 @@
   "author": "Bohooslav <bpavlisinec@gmail.com>",
   "description": "Read the Bible with full emphasis on the God`s Word only. Sola scriptura. Read God`s Word with a deep understanding of His design. Bible elevates your soul with rapid ascension to calm, safety and more.",
   "dependencies": {
-    "electron-store": "^10.0.0"
+    "electron-store": "^10.0.1"
   },
   "devDependencies": {
-    "electron": "^31.4.0",
-    "electron-builder": "^24.13.3",
-    "electron-vite": "^2.3.0"
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^3.1.0"
   },
   "files": [
     "!**/.vscode/*",
@@ -66,5 +66,6 @@
       "category": "Education"
     },
     "icon": "./build/icon.png"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
