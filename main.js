@@ -220,6 +220,7 @@ if (!gotTheLock) {
   app.quit(); // or maybe ignore
 } else {
   app.on("second-instance", async (event, commandLine, workingDirectory) => {
+    consoe.log("second-instance", event, commandLine, workingDirectory);
     // Someone tried to run a second instance, we should focus our window.
     if (win) {
       if (win.isMinimized()) win.restore();
@@ -229,6 +230,15 @@ if (!gotTheLock) {
       ? win.webContents.session
       : session.defaultSession;
     // the commandLine is array of strings in which last element is deep link url
+    const lastCommand = commandLine.pop();
+    try {
+      // if the last element is not a url -- then it's not a deep link
+      new URL(lastCommand);
+    } catch (e) {
+      // if the last element is not a url -- then it's not a deep link
+      console.log("Not a deep link", e);
+      return;
+    }
     const url = new URL(commandLine.pop());
     if (url.protocol !== "bolls:" || !url.searchParams.get("sessionid")) return;
     // if the we already have the cookie set -- we don't need to set it again

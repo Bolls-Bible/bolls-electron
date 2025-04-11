@@ -1,8 +1,8 @@
 [Desktop Entry]
-Version=1.0
+Name=Bolls Bible
+Exec=bolls-run %U
 Terminal=false
 Type=Application
-Name=Bolls
-Exec=/home/b/Bolls-0.1.0.AppImage
-Icon=/home/b/icon.png
-Categories=Education
+Icon=life.bolls.bolls
+Categories=Education;
+MimeType=x-scheme-handler/bolls;
